@@ -1,8 +1,9 @@
 from . import server
 import asyncio
 
+
 def main():
-    """パッケージのエントリポイント"""
+    """Package entry point"""
     try:
         asyncio.run(server.main())
     except KeyboardInterrupt:

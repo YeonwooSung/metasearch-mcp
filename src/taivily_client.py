@@ -3,13 +3,14 @@ import asyncio
 from typing import List, Dict, Optional
 import os
 
+
 class SearchClient:
     def __init__(self,api_key: str):
         """
-        Tavily検索クライアントの初期化
+        Initialize the Tavily search client
         
         Args:
-            api_key: TavilyのAPIキー
+            api_key: Tavily API key
         """
         self.client = AsyncTavilyClient(api_key)
 
@@ -20,17 +21,17 @@ class SearchClient:
                include_answer: bool = True,
                max_results: int = 5) -> Dict:
         """
-        検索を実行します
+        Execute a search
         
         Args:
-            query: 検索クエリ
-            search_depth: 検索の深さ ("basic" or "advanced")
-            include_images: 画像結果を含めるかどうか
-            include_answer: AI生成の回答を含めるかどうか
-            max_results: 返す結果の最大数
+            query: Search query
+            search_depth: Depth of the search ("basic" or "advanced")
+            include_images: Whether to include image results
+            include_answer: Whether to include AI-generated answers
+            max_results: Maximum number of results to return
             
         Returns:
-            検索結果を含む辞書
+            Dictionary containing the search results
         """
         try:
             response = await self.client.search(
@@ -42,8 +43,8 @@ class SearchClient:
             )
             return response
         except Exception as e:
-            print(f"検索エラーが発生しました: {e}")
-            raise RuntimeError(f"回答生成エラーが発生しました: {e}")
+            print(f"Exception: {e}")
+            raise RuntimeError(f"Search error occurred: {e}")
 
     async def qna_search(self,
                         query: str,
@@ -51,16 +52,16 @@ class SearchClient:
                         topic: str = "general",
                         max_results: int = 5) -> str:
         """
-        検索を実行し、質問に対する直接的な回答を返します
+        Execute a search and return a direct answer to the question
         
         Args:
-            query: 質問文
-            search_depth: 検索の深さ ("basic" or "advanced")
-            topic: 検索カテゴリ ("general" or "news")
-            max_results: 返す結果の最大数
+            query: The question text
+            search_depth: Depth of the search ("basic" or "advanced")
+            topic: Search category ("general" or "news")
+            max_results: Maximum number of results to return
             
         Returns:
-            質問に対する回答の文字列
+            String containing the answer to the question
         """
         try:
             answer = await self.client.qna_search(
@@ -71,42 +72,44 @@ class SearchClient:
             )
             return answer
         except Exception as e:
-            print(f"QnA検索エラーが発生しました: {e}")
-            raise RuntimeError(f"QnA検索エラーが発生しました: {e}")
+            print(f"QnA search error occurred: {e}")
+            raise RuntimeError(f"QnA search error occurred: {e}")
+
 
 async def main():
-    # APIキーを設定
+    # Set API key
     API_KEY = os.getenv("TAVILY_API_KEY")
     if not API_KEY:
         print("TAVILY_API_KEY environment variable not found")
         raise ValueError("TAVILY_API_KEY environment variable required")
     client = SearchClient(API_KEY)
     
-    # 検索例
-    query = "量工知能は社会にどのような影響を与えますか？"
+    # Search example
+    query = "How does artificial intelligence impact society?"
     
-    # 基本的な検索
-    print("基本的な検索結果:")
+    # Basic search
+    print("Basic search results:")
     results = await client.search(query)
     if results:
-        # AI生成の回答を表示
+        # Display AI-generated answer
         if 'answer' in results:
-            print("\nAI回答:")
+            print("\nAI Answer:")
             print(results['answer'])
         
-        # 検索結果を表示
-        print("\n検索結果:")
+        # Display search results
+        print("\nSearch Results:")
         for i, result in enumerate(results.get('results', []), 1):
-            print(f"\n{i}. {result.get('title', 'タイトルなし')}")
-            print(f"URL: {result.get('url', 'URLなし')}")
-            print(f"概要: {result.get('snippet', '概要なし')}")
+            print(f"\n{i}. {result.get('title', 'No title')}")
+            print(f"URL: {result.get('url', 'No URL')}")
+            print(f"Summary: {result.get('snippet', 'No summary')}")
     
-    # qna_searchの使用例
-    print("\n\nQnA検索:")
+    # QnA search example
+    print("\n\nQnA Search:")
     answer = await client.qna_search(
-        "気候変動対策として何ができますか？"
+        "What can be done to address climate change?"
     )
-    print(f"回答: {answer}")
+    print(f"Answer: {answer}")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

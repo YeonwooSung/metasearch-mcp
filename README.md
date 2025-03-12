@@ -2,7 +2,7 @@
 
 A MCP server for metasearch
 
-<!-- <a href="https://glama.ai/mcp/servers/s0hka6zney"><img width="380" height="200" src="https://glama.ai/mcp/servers/s0hka6zney/badge" alt="tavily-search MCP server" /></a> -->
+<a href="https://glama.ai/mcp/servers/xxb4uogn02"><img width="380" height="200" src="https://glama.ai/mcp/servers/xxb4uogn02/badge" alt="tavily-search MCP server" /></a>
 
 ## Components
 

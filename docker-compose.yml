@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/astral-sh/uv:python3.12-bookworm
+    image: python:3.12-slim
     container_name: mcp_server
     volumes:
       - .:/usr/src/app/mcp-server-tavily

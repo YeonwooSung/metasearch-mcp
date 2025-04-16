@@ -27,13 +27,13 @@ logger = logging.getLogger("metasearch-mcp")
 
 
 # API key for Tavily API
-API_KEY = os.getenv("TAVILY_API_KEY")
+API_KEY = os.getenv("TAVILY_API_KEY", "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")
 if not API_KEY:
     logger.error("TAVILY_API_KEY environment variable not found")
     raise ValueError("TAVILY_API_KEY environment variable required")
 
 # SearXNG URL
-SEARXNG_URL = os.getenv("SEARXNG_URL", "http://host.docker.internal:8080")
+SEARXNG_URL = os.getenv("SEARXNG_URL", "http://searxng:8080")
 logger.info(f"Using SearXNG URL: {SEARXNG_URL}")
 
 

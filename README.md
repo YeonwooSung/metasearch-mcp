@@ -114,7 +114,7 @@ using Docker compose.
 1. Install Docker.
 2. Download the repository.
 ```bash
-git clone https://github.com/Tomatio13/mcp-server-tavily.git
+git clone https://github.com/YeonwooSung/metasearch-mcp.git
 ``` 
 3. Run Docker compose.
 ```bash

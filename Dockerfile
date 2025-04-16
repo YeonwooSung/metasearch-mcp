@@ -32,6 +32,7 @@ COPY --from=uv --chown=app:app /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 
 # Set necessary environment variables
-ENV TAVILY_API_KEY=your_api_key_here
+ENV TAVILY_API_KEY=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
+ENV SEARXNG_URL=http://searxng:8080
 
 ENTRYPOINT ["uv", "--directory", "/app/src", "run", "server.py"]

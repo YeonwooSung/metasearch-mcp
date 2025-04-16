@@ -1,6 +1,6 @@
 from tavily import AsyncTavilyClient
 import asyncio
-from typing import List, Dict, Optional
+from typing import Dict
 import os
 
 

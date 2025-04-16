@@ -12,4 +12,8 @@ def main():
         server.logger.error(f"Server error: {e}", exc_info=True)
         raise
 
-__all__ = ['main', 'server']
+
+__all__ = [
+    'main',
+    'server',
+]

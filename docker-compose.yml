@@ -9,5 +9,30 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - TAVILY_API_KEY=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
+      - SEARXNG_URL=http://searxng:8080
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    networks:
+      - search_network
+    depends_on:
+      - searxng
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+    ports:
+      - "8080:8080"
+    environment:
+      - BASE_URL=http://localhost:8080/
+      - INSTANCE_NAME=SearXNG MCP
+    volumes:
+      - searxng_data:/etc/searxng
+    networks:
+      - search_network
+
+volumes:
+  searxng_data:
+
+networks:
+  search_network:
+    driver: bridge

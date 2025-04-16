@@ -1,9 +1,7 @@
 import os
-import json
 import logging
-from datetime import datetime
 from collections.abc import Sequence
-from typing import Any, Optional
+from typing import Any, Dict, Union
 from tavily import AsyncTavilyClient
 from dotenv import load_dotenv
 from mcp.server import Server
@@ -12,11 +10,10 @@ from mcp.types import (
     Tool,
     TextContent,
     ImageContent,
-    EmbeddedResource,
-    EmptyResult
 )
 from pydantic import AnyUrl
 import asyncio
+import aiohttp
 
 
 load_dotenv()
@@ -29,11 +26,15 @@ logging.basicConfig(
 logger = logging.getLogger("metasearch-mcp")
 
 
-# AP key for Tavily API
+# API key for Tavily API
 API_KEY = os.getenv("TAVILY_API_KEY")
 if not API_KEY:
     logger.error("TAVILY_API_KEY environment variable not found")
     raise ValueError("TAVILY_API_KEY environment variable required")
+
+# SearXNG URL
+SEARXNG_URL = os.getenv("SEARXNG_URL", "http://host.docker.internal:8080")
+logger.info(f"Using SearXNG URL: {SEARXNG_URL}")
 
 
 # Prepare the server
@@ -50,11 +51,16 @@ async def list_resources() -> list[Resource]:
                 There are two types of search_depth: 'basic' and 'advanced', with 'advanced' searching deeper.'",
             mimeType="application/json",
             description="General web search using Tavily API"
+        ),
+        Resource(
+            uri=AnyUrl("imagesearch://query=`Tokyo skyline`,limit=5"),
+            name="Image Search for `Tokyo skyline` with limit of 5 results",
+            mimeType="application/json",
+            description="Image search using SearXNG API"
         )
     ]
     logger.debug(f"Returning resources with full content: {resources}")
     return resources
-
 
 
 @app.list_tools()
@@ -76,6 +82,25 @@ async def list_tools() -> list[Tool]:
                         "type": "string",
                         "description": "Search depth (basic or advanced)",
                         "enum": ["basic", "advanced"]
+                    }
+                },
+                "required": ["query"]
+            }
+        ),
+        Tool(
+            name="image_search",
+            description="Search for images using SearXNG API",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Image search query"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of images to return (default: 5)",
+                        "default": 5
                     }
                 },
                 "required": ["query"]
@@ -121,18 +146,118 @@ async def process_search_results(results: dict) -> TextContent:
     )
 
 
+async def perform_searxng_image_search(query: str, limit: int = 5) -> Dict:
+    """Perform image search using SearXNG API"""
+    logger.info(f"Performing SearXNG image search for: '{query}' with limit {limit}")
+    
+    params = {
+        "q": query,
+        "format": "json",
+        "categories": "images",
+        "language": "en",
+        "pageno": 1,
+        "time_range": "",
+        "safesearch": 1,
+        "theme": "simple"
+    }
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"{SEARXNG_URL}/search", params=params, timeout=30) as response:
+                if response.status != 200:
+                    logger.error(f"SearXNG API returned status code {response.status}")
+                    return {"error": f"SearXNG API returned status code {response.status}"}
+                
+                data = await response.json()
+                logger.debug(f"SearXNG raw response: {data}")
+                
+                # Extract only relevant image results
+                results = []
+                if "results" in data:
+                    for item in data["results"][:limit]:
+                        result = {
+                            "title": item.get("title", "No title"),
+                            "url": item.get("url", ""),
+                            "img_src": item.get("img_src", ""),
+                            "source": item.get("source", "Unknown source"),
+                            "thumbnail": item.get("thumbnail", ""),
+                            "height": item.get("img_height", 0),
+                            "width": item.get("img_width", 0)
+                        }
+                        results.append(result)
+                
+                return {"query": query, "results": results}
+    
+    except aiohttp.ClientError as e:
+        logger.error(f"Error connecting to SearXNG: {str(e)}")
+        return {"error": f"Connection error: {str(e)}"}
+    except asyncio.TimeoutError:
+        logger.error("SearXNG request timed out")
+        return {"error": "Request timed out"}
+    except Exception as e:
+        logger.error(f"Error during SearXNG image search: {str(e)}", exc_info=True)
+        return {"error": f"Error during search: {str(e)}"}
+
+
+async def process_image_search_results(results: Dict) -> Sequence[Union[TextContent, ImageContent]]:
+    """Process image search results and return a sequence of content items"""
+    contents = []
+    
+    if "error" in results:
+        return [TextContent(
+            type="text",
+            text=f"Error in image search: {results['error']}"
+        )]
+    
+    if not results.get("results"):
+        return [TextContent(
+            type="text",
+            text="No image results were found for your query. Please try a different search term."
+        )]
+    
+    # Add text summary of results
+    summary_text = f"Found {len(results['results'])} images matching '{results['query']}':\n\n"
+    for idx, img in enumerate(results['results'], 1):
+        summary_text += f"{idx}. {img['title']}\n"
+        summary_text += f"   Source: {img['source']}\n"
+        summary_text += f"   URL: {img['url']}\n"
+        if img['height'] and img['width']:
+            summary_text += f"   Size: {img['width']}x{img['height']}\n"
+        summary_text += "\n"
+    
+    contents.append(TextContent(type="text", text=summary_text))
+    
+    # Add actual images
+    for img in results['results']:
+        if img.get('img_src'):
+            contents.append(ImageContent(
+                type="image",
+                url=img['img_src'],
+                title=img['title']
+            ))
+    
+    return contents
+
+
 @app.call_tool()
-async def call_tool(name: str, arguments: Any) -> Sequence[TextContent]:
-    """Calling the search tool"""
+async def call_tool(name: str, arguments: Any) -> Sequence[Union[TextContent, ImageContent]]:
+    """Calling a tool based on name"""
     logger.info(f"TOOL_CALL_DEBUG: Tool called - name: {name}, arguments: {arguments}")
     
-    if name != "search":
+    if name == "search":
+        return await handle_tavily_search(arguments)
+    elif name == "image_search":
+        return await handle_searxng_image_search(arguments)
+    else:
         logger.error(f"Unknown tool requested: {name}")
         return [TextContent(
             type="text",
-            text=f"Error: Unknown tool '{name}'. Only 'search' is supported."
+            text=f"Error: Unknown tool '{name}'. Supported tools are 'search' and 'image_search'."
         )]
 
+
+async def handle_tavily_search(arguments: Dict) -> Sequence[TextContent]:
+    """Handle Tavily web search"""
     if not isinstance(arguments, dict) or "query" not in arguments:
         logger.error(f"Invalid arguments provided: {arguments}")
         return [TextContent(
@@ -144,7 +269,7 @@ async def call_tool(name: str, arguments: Any) -> Sequence[TextContent]:
         client = AsyncTavilyClient(API_KEY)
         query = arguments["query"]
         
-        logger.info(f"Executing search with query: '{query}'")
+        logger.info(f"Executing Tavily search with query: '{query}'")
 
         search_task = client.search(
             query=query,
@@ -190,6 +315,42 @@ async def call_tool(name: str, arguments: Any) -> Sequence[TextContent]:
                 type="text",
                 text=f"An unexpected error occurred during the search. Please try again later. Error: {error_message}"
             )]
+
+
+async def handle_searxng_image_search(arguments: Dict) -> Sequence[Union[TextContent, ImageContent]]:
+    """Handle SearXNG image search"""
+    if not isinstance(arguments, dict) or "query" not in arguments:
+        logger.error(f"Invalid arguments provided for image search: {arguments}")
+        return [TextContent(
+            type="text",
+            text="Error: Invalid arguments. A 'query' parameter is required for image search."
+        )]
+
+    try:
+        query = arguments["query"]
+        limit = int(arguments.get("limit", 5))
+        
+        # Ensure limit is reasonable
+        if limit < 1:
+            limit = 1
+        elif limit > 20:
+            limit = 20
+            
+        logger.info(f"Executing SearXNG image search with query: '{query}', limit: {limit}")
+        
+        # Perform the search
+        search_results = await perform_searxng_image_search(query, limit)
+        
+        # Process the results
+        return await process_image_search_results(search_results)
+            
+    except Exception as e:
+        error_message = str(e)
+        logger.error(f"Image search failed: {error_message}", exc_info=True)
+        return [TextContent(
+            type="text",
+            text=f"An unexpected error occurred during image search. Please try again later. Error: {error_message}"
+        )]
 
 
 # start the server

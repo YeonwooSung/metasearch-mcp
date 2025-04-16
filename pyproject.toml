@@ -5,6 +5,7 @@ description = "A MCP server project"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "aiohttp>=3.11.16",
     "httpx>=0.28.0",
     "mcp>=1.0.0",
     "python-dotenv>=1.0.1",

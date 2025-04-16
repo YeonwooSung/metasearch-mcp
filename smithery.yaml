@@ -18,4 +18,4 @@ startCommand:
   commandFunction:
     # A function that produces the CLI command to start the MCP on stdio.
     |-
-    (config) => ({ command: 'uv', args: ['--directory', '/app/src', 'run', 'server.py'], env: { TAVILY_API_KEY: config.tavilyApiKey } })
+    (config) => ({ command: 'uv', args: ['--directory', '/app/src', 'run', 'server.py'], env: { TAVILY_API_KEY: config.tavilyApiKey, SEARXNG_URL: config.searxngUrl } })
